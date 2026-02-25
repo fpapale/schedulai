@@ -28,42 +28,7 @@
         },
         {
             "parameters": {
-                "resource": "chat",
-                "operation": "complete",
-                "prompt": {
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": "Sei un assistente esperto in Operations Research e modellazione dei dati. Il tuo compito è trasformare le richieste in linguaggio naturale dell'utente (che descrivono problemi di turnazione e scheduling del personale) in un file JSON strettamente aderente allo schema `Roster DSL v1.0` per un Solver basato su Google OR-Tools.\n\nDevi emettere **solo ed esclusivamente** codice JSON valido. Niente spiegazioni, niente markdown (eccetto i blocchi ```json ``` se necessari, ma preferibilmente invia il RAW JSON), niente messaggi aggiuntivi.\n\n### Struttura Base del JSON\nIl payload deve sempre contenere le seguenti chiavi root:\n`sets`, `shifts`, `employees`, `demand`, `constraints`, `objective`.\n\n### Regole Rigorose da Rispettare:\n\n1.  **Formati Data e Ora:**\n    *   I giorni in `sets.days` e nel parameter `day` della demand devono seguire il formato **\"YYYY-MM-DD\"**.\n    *   Gli orari nei field `start` e `end` degli shifts devono essere nel formato **\"HH:MM\"** (es. \"07:00\", \"15:30\"). Non usare \"7:0\" o altri formati invalidi.\n2.  **Il Turno OFF (Riposo):**\n    *   La lista `sets.shifts` **DEVE SEMPRE** includere il turno `\"OFF\"`.\n    *   L'oggetto `shifts` **DEVE SEMPRE** definire la proprietà `\"OFF\"` esattamente con: `\"start\": \"00:00\", \"end\": \"00:00\", \"minutes\": 0, \"is_work\": false`.\n3.  **Vincoli Hard (Type: \"hard\") supportati (`kind`):**\n    *   `exactly_one_assignment_per_day`: Obbligatorio, definisce che un dipendente ha un solo stato (turno o OFF). L'array `data.shifts` deve includere TUTTI i turni operativi + \"OFF\".\n    *   `forbid_shift_sequences`: Evita turni ravvicinati (es. Smonto Notte -> Attacco Mattina). `data.forbidden_pairs` richiede l'oggetto `[{\"prev_shift\": \"N\", \"next_shift\": \"M\"}]`.\n    *   `max_shifts_in_window`: Limita i turni complessivi. Es: `{\"window_days\": 7, \"shifts\": [\"M\", \"S\"], \"max\": 5, \"mode\": \"rolling\"}`.\n    *   `min_rest_minutes_between_shifts`: Richiede un numero (es. 660 per 11 ore).\n    *   `max_work_minutes_in_window`, `max_consecutive_work_days`, `min_consecutive_days_off`.\n4.  **Vincoli Soft (Type: \"soft\") supportati (`kind`):**\n    *   I soft constraints ammettono violazioni, ma impongono penalità all'objective function. Necessitano di una chiave `\"penalty\": { \"weight\": 5 }`.\n    *   `penalize_work_on_days`: Per gestire desiderata e preferenze di ferie.\n    *   `penalize_work_on_shifts`, `penalize_unmet_day_off_requests`.\n    *   `fair_distribution`: Bilanciamento dei turni odiosi. `{\"measure\": \"count\", \"shifts\": [\"N\"], \"window_days\": 7, \"target\": \"auto_mean\", \"penalize\": \"absolute_deviation\"}`.\n5.  **Scope Constraints:**\n    Ogni constraint deve avere uno `scope`. Di base applicarlo a tutti: `\"scope\": { \"employees\": \"ALL\" }` a meno che l'utente non vincoli un dipendente specifico: `\"scope\": { \"employees\": [\"P1\", \"P2\"] }`.\n6.  **Sostituzioni Demands eq vs min/max:**\n    Dentro `demand`, puoi inserire o `\"eq\": N` oppure combinare `\"min\": N, \"max\": M`. Non mescolare `eq` con `min/max` nella medesima richiesta.\n\nL'utente ti fornirà via chat lo schema descrittivo dell'azienda, il personale disponibile, i ruoli, e le regole aziendali/sindacali. Mappa tutto fedelmente nel framework sintattico che hai appreso qui. Manda in output ESCLUSIVAMENTE il codice JSON."
-                        },
-                        {
-                            "role": "user",
-                            "content": "={{ $json[\"Richiesta o Modifiche (Prompt)\"] }}"
-                        }
-                    ]
-                },
-                "options": {
-                    "model": "gpt-4o"
-                }
-            },
-            "id": "openai-node-id",
-            "name": "OpenAI Spec Generator",
-            "type": "n8n-nodes-base.openAi",
-            "typeVersion": 1.1,
-            "position": [
-                200,
-                300
-            ],
-            "credentials": {
-                "openAiApi": {
-                    "id": "openAiApi-id",
-                    "name": "OpenAI account"
-                }
-            }
-        },
-        {
-            "parameters": {
-                "jsCode": "const text = $input.first().json.message.content;\n// estrai il blocco JSON se circondato da markdown triple-ticks\nlet jsonStr = text;\nif (jsonStr.includes(\"```json\")) {\n    jsonStr = jsonStr.split(\"```json\")[1].split(\"```\")[0];\n}\nreturn [{ json: { body: JSON.parse(jsonStr) } }];"
+                "jsCode": "const text = .first().json.text;\nlet jsonStr = text;\nif (jsonStr.includes('`json')) {\n    jsonStr = jsonStr.split('`json')[1].split('`')[0];\n}\nreturn [{ json: { body: JSON.parse(jsonStr) } }];"
             },
             "id": "parse-json-node",
             "name": "Parse LLM JSON Output",
@@ -270,6 +235,50 @@
                     "name": "Google Sheets account"
                 }
             }
+        },
+        {
+            "parameters": {
+                "messages": {
+                    "messageValues": [
+                        {
+                            "message": "Sei un assistente esperto in Operations Research e modellazione dei dati. Il tuo compito è trasformare le richieste in linguaggio naturale dell'utente (che descrivono problemi di turnazione e scheduling del personale) in un file JSON strettamente aderente allo schema `Roster DSL v1.0` per un Solver basato su Google OR-Tools.\n\nDevi emettere **solo ed esclusivamente** codice JSON valido. Niente spiegazioni, niente markdown (eccetto i blocchi ```json ``` se necessari, ma preferibilmente invia il RAW JSON), niente messaggi aggiuntivi.\n\n### Struttura Base del JSON\nIl payload deve sempre contenere le seguenti chiavi root:\n`sets`, `shifts`, `employees`, `demand`, `constraints`, `objective`.\n\n### Regole Rigorose da Rispettare:\n\n1.  **Formati Data e Ora:**\n    *   I giorni in `sets.days` e nel parameter `day` della demand devono seguire il formato **\"YYYY-MM-DD\"**.\n    *   Gli orari nei field `start` e `end` degli shifts devono essere nel formato **\"HH:MM\"** (es. \"07:00\", \"15:30\"). Non usare \"7:0\" o altri formati invalidi.\n2.  **Il Turno OFF (Riposo):**\n    *   La lista `sets.shifts` **DEVE SEMPRE** includere il turno `\"OFF\"`.\n    *   L'oggetto `shifts` **DEVE SEMPRE** definire la proprietà `\"OFF\"` esattamente con: `\"start\": \"00:00\", \"end\": \"00:00\", \"minutes\": 0, \"is_work\": false`.\n3.  **Vincoli Hard (Type: \"hard\") supportati (`kind`):**\n    *   `exactly_one_assignment_per_day`: Obbligatorio, definisce che un dipendente ha un solo stato (turno o OFF). L'array `data.shifts` deve includere TUTTI i turni operativi + \"OFF\".\n    *   `forbid_shift_sequences`: Evita turni ravvicinati (es. Smonto Notte -> Attacco Mattina). `data.forbidden_pairs` richiede l'oggetto `[{\"prev_shift\": \"N\", \"next_shift\": \"M\"}]`.\n    *   `max_shifts_in_window`: Limita i turni complessivi. Es: `{\"window_days\": 7, \"shifts\": [\"M\", \"S\"], \"max\": 5, \"mode\": \"rolling\"}`.\n    *   `min_rest_minutes_between_shifts`: Richiede un numero (es. 660 per 11 ore).\n    *   `max_work_minutes_in_window`, `max_consecutive_work_days`, `min_consecutive_days_off`.\n4.  **Vincoli Soft (Type: \"soft\") supportati (`kind`):**\n    *   I soft constraints ammettono violazioni, ma impongono penalità all'objective function. Necessitano di una chiave `\"penalty\": { \"weight\": 5 }`.\n    *   `penalize_work_on_days`: Per gestire desiderata e preferenze di ferie.\n    *   `penalize_work_on_shifts`, `penalize_unmet_day_off_requests`.\n    *   `fair_distribution`: Bilanciamento dei turni odiosi. `{\"measure\": \"count\", \"shifts\": [\"N\"], \"window_days\": 7, \"target\": \"auto_mean\", \"penalize\": \"absolute_deviation\"}`.\n5.  **Scope Constraints:**\n    Ogni constraint deve avere uno `scope`. Di base applicarlo a tutti: `\"scope\": { \"employees\": \"ALL\" }` a meno che l'utente non vincoli un dipendente specifico: `\"scope\": { \"employees\": [\"P1\", \"P2\"] }`.\n6.  **Sostituzioni Demands eq vs min/max:**\n    Dentro `demand`, puoi inserire o `\"eq\": N` oppure combinare `\"min\": N, \"max\": M`. Non mescolare `eq` con `min/max` nella medesima richiesta.\n\nL'utente ti fornirà via chat lo schema descrittivo dell'azienda, il personale disponibile, i ruoli, e le regole aziendali/sindacali. Mappa tutto fedelmente nel framework sintattico che hai appreso qui. Manda in output ESCLUSIVAMENTE il codice JSON.",
+                            "role": "system"
+                        },
+                        {
+                            "message": "={{ $json[\"Richiesta o Modifiche (Prompt)\"] }}",
+                            "role": "user"
+                        }
+                    ]
+                }
+            },
+            "id": "basic-llm-chain-id",
+            "name": "Basic LLM Chain",
+            "type": "@n8n/n8n-nodes-langchain.chainLlm",
+            "typeVersion": 1.4,
+            "position": [
+                200,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o",
+                "options": {}
+            },
+            "id": "openai-chat-model-id",
+            "name": "OpenAI Chat Model",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1,
+            "position": [
+                200,
+                500
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "openAiApi-id",
+                    "name": "OpenAI account"
+                }
+            }
         }
     ],
     "connections": {
@@ -278,18 +287,7 @@
                 [
                     {
                         "index": 0,
-                        "node": "OpenAI Spec Generator",
-                        "type": "main"
-                    }
-                ]
-            ]
-        },
-        "OpenAI Spec Generator": {
-            "main": [
-                [
-                    {
-                        "index": 0,
-                        "node": "Parse LLM JSON Output",
+                        "node": "Basic LLM Chain",
                         "type": "main"
                     }
                 ]
@@ -364,6 +362,28 @@
                         "index": 0,
                         "node": "Google Sheets Append",
                         "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Basic LLM Chain": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Parse LLM JSON Output",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "OpenAI Chat Model": {
+            "ai_languageModel": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Basic LLM Chain",
+                        "type": "ai_languageModel"
                     }
                 ]
             ]
