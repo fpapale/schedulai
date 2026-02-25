@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  solver-api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/postgres
+    ports:
+      - "8001:8000"
+    depends_on:
+      - postgres
+
+  dsl-editor:
+    build: ./webui2
+    ports:
+      - "8080:80"
+    depends_on:
+      - solver-api
+    volumes:
+      - ./dsl.schema.json:/usr/share/nginx/html/dsl.schema.json:ro
+      - ./spec.json:/usr/share/nginx/html/spec.json:ro
+volumes:
+  pgdata:

@@ -1,0 +1,111 @@
+{
+    "name": "OR-Tools SchedulAI solver",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "ortools-solve",
+                "options": {}
+            },
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ],
+            "webhookId": "ortools-webhook-id"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://192.168.0.72:8001/solve",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={ \"spec\": {{$json.body}}, \"max_time_seconds\": 30 }",
+                "options": {
+                    "timeout": 60000
+                }
+            },
+            "name": "Solve API",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const results = [];\nconst data = $input.first().json;\nif (!data || !data.schedule) return [];\nfor (const date of Object.keys(data.schedule)) {\n  for (const site of Object.keys(data.schedule[date])) {\n    if (site === 'OFF') {\n        for (const emp of data.schedule[date][site]) {\n            results.push({ json: { date, site, shift: 'OFF', employee: emp } });\n        }\n        continue;\n    }\n    for (const shift of Object.keys(data.schedule[date][site])) {\n      for (const emp of data.schedule[date][site][shift]) {\n        results.push({ json: { date, site, shift, employee: emp } });\n      }\n    }\n  }\n}\nreturn results;"
+            },
+            "name": "Flatten Schedule",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "append",
+                "documentId": {
+                    "__rl": true,
+                    "value": "YOUR_DOCUMENT_ID",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "Sheet1",
+                    "mode": "name"
+                },
+                "options": {}
+            },
+            "name": "Google Sheets",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [
+                850,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Solve API",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Solve API": {
+            "main": [
+                [
+                    {
+                        "node": "Flatten Schedule",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Flatten Schedule": {
+            "main": [
+                [
+                    {
+                        "node": "Google Sheets",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "active": false,
+    "settings": {}
+}
