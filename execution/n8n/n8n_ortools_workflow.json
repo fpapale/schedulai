@@ -2,38 +2,53 @@
     "name": "OR-Tools SchedulAI solver",
     "nodes": [
         {
+            "id": "node-1",
+            "name": "Webhook",
             "parameters": {
                 "httpMethod": "POST",
-                "path": "ortools-solve",
-                "options": {}
+                "options": {},
+                "path": "ortools-solve"
             },
-            "name": "Webhook",
+            "position": [
+                112,
+                304
+            ],
             "type": "n8n-nodes-base.webhook",
             "typeVersion": 1,
-            "position": [
-                100,
-                300
-            ],
-            "webhookId": "ortools-webhook-id"
+            "webhookId": "5f90d278-6917-4a04-a8c1-2a5c4ac91fcf"
         },
         {
+            "id": "d7393075-c8b1-47a9-822c-7ca1e1930fae",
+            "name": "When clicking ‘Execute workflow’",
+            "parameters": {},
+            "position": [
+                112,
+                496
+            ],
+            "type": "n8n-nodes-base.manualTrigger",
+            "typeVersion": 1
+        },
+        {
+            "id": "node-validate",
+            "name": "Validate API",
             "parameters": {
+                "jsonBody": "={{ { \"spec\": $json.body ? $json.body : $json, \"max_time_seconds\": 10 } }}",
                 "method": "POST",
-                "url": "http://192.168.0.72:8001/validate",
+                "options": {},
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={ \"spec\": {{$json.body}}, \"max_time_seconds\": 10}",
-                "options": {}
+                "url": "http://192.168.0.72:8001/validate"
             },
-            "name": "Validate API",
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 4,
             "position": [
-                300,
-                300
-            ]
+                304,
+                304
+            ],
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4
         },
         {
+            "id": "valid-check-node-id",
+            "name": "Is Valid?",
             "parameters": {
                 "conditions": {
                     "boolean": [
@@ -44,102 +59,106 @@
                     ]
                 }
             },
-            "id": "valid-check-node-id",
-            "name": "Is Valid?",
-            "type": "n8n-nodes-base.if",
-            "typeVersion": 1,
             "position": [
-                500,
-                300
-            ]
+                512,
+                304
+            ],
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1
         },
         {
+            "id": "stop-error-node-id",
+            "name": "Stop on Error",
             "parameters": {
                 "errorMessage": "={{ $json.errors ? $json.errors.join(', ') : 'Errore sconosciuto durante la validazione' }}"
             },
-            "id": "stop-error-node-id",
-            "name": "Stop on Error",
-            "type": "n8n-nodes-base.stopAndError",
-            "typeVersion": 1,
             "position": [
-                500,
-                500
-            ]
+                720,
+                416
+            ],
+            "type": "n8n-nodes-base.stopAndError",
+            "typeVersion": 1
         },
         {
+            "id": "node-2",
+            "name": "Solve API",
             "parameters": {
+                "jsonBody": "={{ { \"spec\": $('Webhook').first() ? $('Webhook').first().json.body : $('When clicking ‘Execute workflow’').first().json, \"max_time_seconds\": 30 } }}",
                 "method": "POST",
-                "url": "http://192.168.0.72:8001/solve",
-                "sendBody": true,
-                "specifyBody": "json",
-                "jsonBody": "={ \"spec\": {{$node[\"Webhook\"].json.body}}, \"max_time_seconds\": 30 }",
                 "options": {
                     "timeout": 60000
-                }
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "url": "http://192.168.0.72:8001/solve"
             },
-            "name": "Solve API",
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 4,
             "position": [
-                700,
-                200
-            ]
+                704,
+                208
+            ],
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4
         },
         {
+            "id": "node-3",
+            "name": "Flatten Schedule",
             "parameters": {
                 "jsCode": "const results = [];\nconst data = $input.first().json;\nif (!data || !data.schedule) return [];\nfor (const date of Object.keys(data.schedule)) {\n  for (const site of Object.keys(data.schedule[date])) {\n    if (site === 'OFF') {\n        for (const emp of data.schedule[date][site]) {\n            results.push({ json: { date, site, shift: 'OFF', employee: emp } });\n        }\n        continue;\n    }\n    for (const shift of Object.keys(data.schedule[date][site])) {\n      for (const emp of data.schedule[date][site][shift]) {\n        results.push({ json: { date, site, shift, employee: emp } });\n      }\n    }\n  }\n}\nreturn results;"
             },
-            "name": "Flatten Schedule",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2,
             "position": [
-                900,
-                200
-            ]
+                912,
+                208
+            ],
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2
         },
         {
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "XhB46DjOXLGiBY5t",
+                    "name": "Google Sheets account"
+                }
+            },
+            "id": "node-4",
+            "name": "Google Sheets",
             "parameters": {
-                "operation": "append",
+                "columns": {
+                    "attemptToConvertTypes": false,
+                    "convertFieldsToString": false,
+                    "mappingMode": "defineBelow",
+                    "matchingColumns": [],
+                    "schema": [],
+                    "value": {}
+                },
                 "documentId": {
                     "__rl": true,
-                    "value": "YOUR_DOCUMENT_ID",
-                    "mode": "id"
+                    "mode": "id",
+                    "value": "YOUR_DOCUMENT_ID"
                 },
+                "operation": "append",
+                "options": {},
                 "sheetName": {
                     "__rl": true,
-                    "value": "Sheet1",
-                    "mode": "name"
-                },
-                "options": {}
+                    "mode": "name",
+                    "value": "Sheet1"
+                }
             },
-            "name": "Google Sheets",
-            "type": "n8n-nodes-base.googleSheets",
-            "typeVersion": 4,
             "position": [
-                1100,
-                200
-            ]
+                1104,
+                208
+            ],
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4
         }
     ],
     "connections": {
-        "Webhook": {
+        "Flatten Schedule": {
             "main": [
                 [
                     {
-                        "node": "Validate API",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Validate API": {
-            "main": [
-                [
-                    {
-                        "node": "Is Valid?",
-                        "type": "main",
-                        "index": 0
+                        "index": 0,
+                        "node": "Google Sheets",
+                        "type": "main"
                     }
                 ]
             ]
@@ -148,16 +167,16 @@
             "main": [
                 [
                     {
+                        "index": 0,
                         "node": "Solve API",
-                        "type": "main",
-                        "index": 0
+                        "type": "main"
                     }
                 ],
                 [
                     {
+                        "index": 0,
                         "node": "Stop on Error",
-                        "type": "main",
-                        "index": 0
+                        "type": "main"
                     }
                 ]
             ]
@@ -166,25 +185,53 @@
             "main": [
                 [
                     {
+                        "index": 0,
                         "node": "Flatten Schedule",
-                        "type": "main",
-                        "index": 0
+                        "type": "main"
                     }
                 ]
             ]
         },
-        "Flatten Schedule": {
+        "Validate API": {
             "main": [
                 [
                     {
-                        "node": "Google Sheets",
-                        "type": "main",
-                        "index": 0
+                        "index": 0,
+                        "node": "Is Valid?",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Validate API",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "When clicking ‘Execute workflow’": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Validate API",
+                        "type": "main"
                     }
                 ]
             ]
         }
     },
     "active": false,
-    "settings": {}
+    "settings": {
+        "executionOrder": "v1",
+        "saveDataErrorExecution": "all",
+        "saveDataSuccessExecution": "all",
+        "saveExecutionProgress": true,
+        "saveManualExecutions": true
+    }
 }
