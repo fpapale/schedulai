@@ -83,7 +83,7 @@
             "id": "node-2",
             "name": "Solve API",
             "parameters": {
-                "jsonBody": "={{ { \"spec\": $('Webhook').first() ? $('Webhook').first().json.body : $('When clicking ‘Execute workflow’').first().json, \"max_time_seconds\": 30 } }}",
+                "jsonBody": "={{ { \"spec\": $if($(\"Webhook\").isExecuted, $(\"Webhook\").first().json.body, $(\"When clicking ‘Execute workflow’\").first().json), \"max_time_seconds\": 30 } }}",
                 "method": "POST",
                 "options": {
                     "timeout": 60000
