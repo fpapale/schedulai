@@ -1,0 +1,24 @@
+"Ciao, ho bisogno di generare il piano turni per la prima settimana di Marzo 2026, dal 2 al 8 Marzo compresi. 
+
+Abbiamo un solo sito di erogazione chiamato SITE_A.
+I turni operativi possibili sono due:
+- Mattina (M): dalle 07:00 alle 15:00 (480 minuti).
+- Sera (S): dalle 15:00 alle 23:00 (480 minuti).
+
+Il nostro team è composto da 10 dipendenti (da P1 a P10), tutti con contratto full_time e associati a SITE_A come sede base. Hanno tutti il ruolo di cleaner. 
+Però, solo i dipendenti da P1 a P3 possiedono la skill certified. I restanti (P4-P10) non hanno skill particolari.
+
+Fabbisogno (Demand):
+Per ogni singolo giorno della settimana, ci servono esattamente:
+- 3 persone per il turno M (di cui almeno 1 deve avere la skill certified).
+- 2 persone per il turno S (di cui almeno 1 deve avere la skill certified).
+
+Regole e Vincoli (Constraints):
+1. (Hard) Ogni dipendente può fare un solo turno al giorno (oppure stare a riposo OFF).
+2. (Hard) È vietata la sequenza Smonto-Sera / Attacco-Mattina. Quindi se uno fa il turno S, il giorno dopo non può fare M.
+3. (Hard) Massimo 5 turni lavorati su una finestra mobile di 7 giorni.
+4. (Soft) Il dipendente P10 ha chiesto di non lavorare nel weekend (7 e 8 Marzo). Penalizza l'assegnazione di turni M o S in quei giorni con un peso di 3.
+5. (Soft) Distribuzione equa dei turni serali (S) tra tutti i dipendenti su finestre di 7 giorni, penalizzando le deviazioni dalla media automatica con un peso di 5.
+
+L'obiettivo del solver è minimizzare le penalità totali (i soft constraints).
+Generami il JSON."
