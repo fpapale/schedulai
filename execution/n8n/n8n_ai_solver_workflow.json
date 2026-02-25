@@ -1,0 +1,376 @@
+{
+    "name": "OR-Tools AI SchedulAI solver",
+    "nodes": [
+        {
+            "parameters": {
+                "title": "Generatore Orari SchedulAI",
+                "description": "Descrivi i tuoi requisiti per la generazione automatica dei turni.",
+                "formFields": {
+                    "values": [
+                        {
+                            "fieldLabel": "Richiesta o Modifiche (Prompt)",
+                            "fieldType": "textarea",
+                            "defaultValue": "\"Ciao, ho bisogno di generare il piano turni per la prima settimana di Marzo 2026, dal 2 al 8 Marzo compresi. \\n\\nAbbiamo un solo sito di erogazione chiamato SITE_A.\\nI turni operativi possibili sono due:\\n- Mattina (M): dalle 07:00 alle 15:00 (480 minuti).\\n- Sera (S): dalle 15:00 alle 23:00 (480 minuti).\\n\\nIl nostro team è composto da 10 dipendenti (da P1 a P10), tutti con contratto full_time e associati a SITE_A come sede base. Hanno tutti il ruolo di cleaner. \\nPerò, solo i dipendenti da P1 a P3 possiedono la skill certified. I restanti (P4-P10) non hanno skill particolari.\\n\\nFabbisogno (Demand):\\nPer ogni singolo giorno della settimana, ci servono esattamente:\\n- 3 persone per il turno M (di cui almeno 1 deve avere la skill certified).\\n- 2 persone per il turno S (di cui almeno 1 deve avere la skill certified).\\n\\nRegole e Vincoli (Constraints):\\n1. (Hard) Ogni dipendente può fare un solo turno al giorno (oppure stare a riposo OFF).\\n2. (Hard) È vietata la sequenza Smonto-Sera / Attacco-Mattina. Quindi se uno fa il turno S, il giorno dopo non può fare M.\\n3. (Hard) Massimo 5 turni lavorati su una finestra mobile di 7 giorni.\\n4. (Soft) Il dipendente P10 ha chiesto di non lavorare nel weekend (7 e 8 Marzo). Penalizza l'assegnazione di turni M o S in quei giorni con un peso di 3.\\n5. (Soft) Distribuzione equa dei turni serali (S) tra tutti i dipendenti su finestre di 7 giorni, penalizzando le deviazioni dalla media automatica con un peso di 5.\\n\\nL'obiettivo del solver è minimizzare le penalità totali (i soft constraints).\\nGenerami il JSON.\"",
+                            "requiredField": true
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "form-trigger-id",
+            "name": "On form submission",
+            "type": "n8n-nodes-base.formTrigger",
+            "position": [
+                0,
+                300
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o",
+                "messages": {
+                    "messageValues": [
+                        {
+                            "message": "Sei un assistente esperto in Operations Research e modellazione dei dati. Il tuo compito è trasformare le richieste in linguaggio naturale dell'utente (che descrivono problemi di turnazione e scheduling del personale) in un file JSON strettamente aderente allo schema `Roster DSL v1.0` per un Solver basato su Google OR-Tools.\n\nDevi emettere **solo ed esclusivamente** codice JSON valido. Niente spiegazioni, niente markdown (eccetto i blocchi ```json ``` se necessari, ma preferibilmente invia il RAW JSON), niente messaggi aggiuntivi.\n\n### Struttura Base del JSON\nIl payload deve sempre contenere le seguenti chiavi root:\n`sets`, `shifts`, `employees`, `demand`, `constraints`, `objective`.\n\n### Regole Rigorose da Rispettare:\n\n1.  **Formati Data e Ora:**\n    *   I giorni in `sets.days` e nel parameter `day` della demand devono seguire il formato **\"YYYY-MM-DD\"**.\n    *   Gli orari nei field `start` e `end` degli shifts devono essere nel formato **\"HH:MM\"** (es. \"07:00\", \"15:30\"). Non usare \"7:0\" o altri formati invalidi.\n2.  **Il Turno OFF (Riposo):**\n    *   La lista `sets.shifts` **DEVE SEMPRE** includere il turno `\"OFF\"`.\n    *   L'oggetto `shifts` **DEVE SEMPRE** definire la proprietà `\"OFF\"` esattamente con: `\"start\": \"00:00\", \"end\": \"00:00\", \"minutes\": 0, \"is_work\": false`.\n3.  **Vincoli Hard (Type: \"hard\") supportati (`kind`):**\n    *   `exactly_one_assignment_per_day`: Obbligatorio, definisce che un dipendente ha un solo stato (turno o OFF). L'array `data.shifts` deve includere TUTTI i turni operativi + \"OFF\".\n    *   `forbid_shift_sequences`: Evita turni ravvicinati (es. Smonto Notte -> Attacco Mattina). `data.forbidden_pairs` richiede l'oggetto `[{\"prev_shift\": \"N\", \"next_shift\": \"M\"}]`.\n    *   `max_shifts_in_window`: Limita i turni complessivi. Es: `{\"window_days\": 7, \"shifts\": [\"M\", \"S\"], \"max\": 5, \"mode\": \"rolling\"}`.\n    *   `min_rest_minutes_between_shifts`: Richiede un numero (es. 660 per 11 ore).\n    *   `max_work_minutes_in_window`, `max_consecutive_work_days`, `min_consecutive_days_off`.\n4.  **Vincoli Soft (Type: \"soft\") supportati (`kind`):**\n    *   I soft constraints ammettono violazioni, ma impongono penalità all'objective function. Necessitano di una chiave `\"penalty\": { \"weight\": 5 }`.\n    *   `penalize_work_on_days`: Per gestire desiderata e preferenze di ferie.\n    *   `penalize_work_on_shifts`, `penalize_unmet_day_off_requests`.\n    *   `fair_distribution`: Bilanciamento dei turni odiosi. `{\"measure\": \"count\", \"shifts\": [\"N\"], \"window_days\": 7, \"target\": \"auto_mean\", \"penalize\": \"absolute_deviation\"}`.\n5.  **Scope Constraints:**\n    Ogni constraint deve avere uno `scope`. Di base applicarlo a tutti: `\"scope\": { \"employees\": \"ALL\" }` a meno che l'utente non vincoli un dipendente specifico: `\"scope\": { \"employees\": [\"P1\", \"P2\"] }`.\n6.  **Sostituzioni Demands eq vs min/max:**\n    Dentro `demand`, puoi inserire o `\"eq\": N` oppure combinare `\"min\": N, \"max\": M`. Non mescolare `eq` con `min/max` nella medesima richiesta.\n\nL'utente ti fornirà via chat lo schema descrittivo dell'azienda, il personale disponibile, i ruoli, e le regole aziendali/sindacali. Mappa tutto fedelmente nel framework sintattico che hai appreso qui. Manda in output ESCLUSIVAMENTE il codice JSON.",
+                            "role": "system"
+                        },
+                        {
+                            "message": "={{ $json[\"Richiesta o Modifiche (Prompt)\"] }}",
+                            "role": "user"
+                        }
+                    ]
+                }
+            },
+            "id": "openai-node-id",
+            "name": "OpenAI Spec Generator",
+            "type": "@n8n/n8n-nodes-langchain.advancedOpenAi",
+            "typeVersion": 1,
+            "position": [
+                200,
+                300
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "openAiApi-id",
+                    "name": "OpenAI account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const text = $input.first().json.message.content;\n// estrai il blocco JSON se circondato da markdown triple-ticks\nlet jsonStr = text;\nif (jsonStr.includes(\"```json\")) {\n    jsonStr = jsonStr.split(\"```json\")[1].split(\"```\")[0];\n}\nreturn [{ json: { body: JSON.parse(jsonStr) } }];"
+            },
+            "id": "parse-json-node",
+            "name": "Parse LLM JSON Output",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                400,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://192.168.0.72:8001/validate",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ { \"spec\": $json.body, \"max_time_seconds\": 10 } }}",
+                "options": {}
+            },
+            "id": "node-validate",
+            "name": "Validate API",
+            "position": [
+                600,
+                300
+            ],
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "boolean": [
+                        {
+                            "value1": "={{ $json.valid }}",
+                            "value2": true
+                        }
+                    ]
+                }
+            },
+            "id": "valid-check-node-id",
+            "name": "Is Valid?",
+            "position": [
+                800,
+                300
+            ],
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1
+        },
+        {
+            "parameters": {
+                "errorMessage": "={{ $json.errors ? $json.errors.join(', ') : 'Spec generata dall\\'AI non valida' }}"
+            },
+            "id": "stop-error-node-id",
+            "name": "Stop on Error",
+            "position": [
+                1000,
+                450
+            ],
+            "type": "n8n-nodes-base.stopAndError",
+            "typeVersion": 1
+        },
+        {
+            "parameters": {
+                "operation": "clear",
+                "documentId": {
+                    "__rl": true,
+                    "value": "YOUR_DOCUMENT_ID",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "mode": "name",
+                    "value": "Sheet1"
+                }
+            },
+            "id": "node-clear-sheets",
+            "name": "Clear Google Sheets",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [
+                1000,
+                150
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "XhB46DjOXLGiBY5t",
+                    "name": "Google Sheets account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://192.168.0.72:8001/solve",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ { \"spec\": $(\"Parse LLM JSON Output\").first().json.body, \"max_time_seconds\": 30 } }}",
+                "options": {
+                    "timeout": 60000
+                }
+            },
+            "id": "node-solve",
+            "name": "Solve API",
+            "position": [
+                1300,
+                150
+            ],
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4
+        },
+        {
+            "parameters": {
+                "jsCode": "const results = [];\nconst data = $input.first().json;\nif (!data || !data.schedule) return [];\nfor (const date of Object.keys(data.schedule)) {\n  for (const site of Object.keys(data.schedule[date])) {\n    if (site === 'OFF') {\n        for (const emp of data.schedule[date][site]) {\n            results.push({ json: { date, site, shift: 'OFF', employee: emp } });\n        }\n        continue;\n    }\n    for (const shift of Object.keys(data.schedule[date][site])) {\n      for (const emp of data.schedule[date][site][shift]) {\n        results.push({ json: { date, site, shift, employee: emp } });\n      }\n    }\n  }\n}\nreturn results;"
+            },
+            "id": "node-flatten",
+            "name": "Flatten Schedule",
+            "position": [
+                1600,
+                150
+            ],
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "operation": "append",
+                "documentId": {
+                    "__rl": true,
+                    "value": "YOUR_DOCUMENT_ID",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "mode": "name",
+                    "value": "Sheet1"
+                },
+                "columns": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "Data": "={{ $json.date }}",
+                        "Cliente/Sede": "={{ $json.site }}",
+                        "Turno (Mattina/Serale)": "={{ $json.shift }}",
+                        "Dipendente": "={{ $json.employee }}"
+                    },
+                    "matchingColumns": [],
+                    "schema": [
+                        {
+                            "id": "Data",
+                            "displayName": "Data",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        },
+                        {
+                            "id": "Cliente/Sede",
+                            "displayName": "Cliente/Sede",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        },
+                        {
+                            "id": "Turno (Mattina/Serale)",
+                            "displayName": "Turno (Mattina/Serale)",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        },
+                        {
+                            "id": "Dipendente",
+                            "displayName": "Dipendente",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        }
+                    ],
+                    "attemptToConvertTypes": false,
+                    "convertFieldsToString": false
+                },
+                "options": {}
+            },
+            "id": "node-append-sheets",
+            "name": "Google Sheets Append",
+            "position": [
+                1900,
+                150
+            ],
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "XhB46DjOXLGiBY5t",
+                    "name": "Google Sheets account"
+                }
+            }
+        }
+    ],
+    "connections": {
+        "On form submission": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "OpenAI Spec Generator",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "OpenAI Spec Generator": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Parse LLM JSON Output",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Parse LLM JSON Output": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Validate API",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Validate API": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Is Valid?",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Is Valid?": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Clear Google Sheets",
+                        "type": "main"
+                    }
+                ],
+                [
+                    {
+                        "index": 0,
+                        "node": "Stop on Error",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Clear Google Sheets": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Solve API",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Solve API": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Flatten Schedule",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Flatten Schedule": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Google Sheets Append",
+                        "type": "main"
+                    }
+                ]
+            ]
+        }
+    },
+    "active": false,
+    "settings": {
+        "executionOrder": "v1",
+        "saveDataErrorExecution": "all",
+        "saveDataSuccessExecution": "all",
+        "saveExecutionProgress": true,
+        "saveManualExecutions": true
+    }
+}
