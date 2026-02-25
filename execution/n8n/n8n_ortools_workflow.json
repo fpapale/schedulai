@@ -1,237 +1,782 @@
 {
-    "name": "OR-Tools SchedulAI solver",
-    "nodes": [
-        {
-            "id": "node-1",
-            "name": "Webhook",
-            "parameters": {
-                "httpMethod": "POST",
-                "options": {},
-                "path": "ortools-solve"
-            },
-            "position": [
-                112,
-                304
-            ],
-            "type": "n8n-nodes-base.webhook",
-            "typeVersion": 1,
-            "webhookId": "5f90d278-6917-4a04-a8c1-2a5c4ac91fcf"
-        },
-        {
-            "id": "d7393075-c8b1-47a9-822c-7ca1e1930fae",
-            "name": "When clicking ‘Execute workflow’",
-            "parameters": {},
-            "position": [
-                112,
-                496
-            ],
-            "type": "n8n-nodes-base.manualTrigger",
-            "typeVersion": 1
-        },
-        {
-            "id": "node-validate",
-            "name": "Validate API",
-            "parameters": {
-                "jsonBody": "={{ { \"spec\": $json.body ? $json.body : $json, \"max_time_seconds\": 10 } }}",
-                "method": "POST",
-                "options": {},
-                "sendBody": true,
-                "specifyBody": "json",
-                "url": "http://192.168.0.72:8001/validate"
-            },
-            "position": [
-                304,
-                304
-            ],
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 4
-        },
-        {
-            "id": "valid-check-node-id",
-            "name": "Is Valid?",
-            "parameters": {
-                "conditions": {
-                    "boolean": [
-                        {
-                            "value1": "={{ $json.valid }}",
-                            "value2": true
-                        }
-                    ]
-                }
-            },
-            "position": [
-                512,
-                304
-            ],
-            "type": "n8n-nodes-base.if",
-            "typeVersion": 1
-        },
-        {
-            "id": "stop-error-node-id",
-            "name": "Stop on Error",
-            "parameters": {
-                "errorMessage": "={{ $json.errors ? $json.errors.join(', ') : 'Errore sconosciuto durante la validazione' }}"
-            },
-            "position": [
-                720,
-                416
-            ],
-            "type": "n8n-nodes-base.stopAndError",
-            "typeVersion": 1
-        },
-        {
-            "id": "node-2",
-            "name": "Solve API",
-            "parameters": {
-                "jsonBody": "={{ { \"spec\": $if($(\"Webhook\").isExecuted, $(\"Webhook\").first().json.body, $(\"When clicking ‘Execute workflow’\").first().json), \"max_time_seconds\": 30 } }}",
-                "method": "POST",
-                "options": {
-                    "timeout": 60000
-                },
-                "sendBody": true,
-                "specifyBody": "json",
-                "url": "http://192.168.0.72:8001/solve"
-            },
-            "position": [
-                704,
-                208
-            ],
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 4
-        },
-        {
-            "id": "node-3",
-            "name": "Flatten Schedule",
-            "parameters": {
-                "jsCode": "const results = [];\nconst data = $input.first().json;\nif (!data || !data.schedule) return [];\nfor (const date of Object.keys(data.schedule)) {\n  for (const site of Object.keys(data.schedule[date])) {\n    if (site === 'OFF') {\n        for (const emp of data.schedule[date][site]) {\n            results.push({ json: { date, site, shift: 'OFF', employee: emp } });\n        }\n        continue;\n    }\n    for (const shift of Object.keys(data.schedule[date][site])) {\n      for (const emp of data.schedule[date][site][shift]) {\n        results.push({ json: { date, site, shift, employee: emp } });\n      }\n    }\n  }\n}\nreturn results;"
-            },
-            "position": [
-                912,
-                208
-            ],
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2
-        },
-        {
-            "credentials": {
-                "googleSheetsOAuth2Api": {
-                    "id": "XhB46DjOXLGiBY5t",
-                    "name": "Google Sheets account"
-                }
-            },
-            "id": "node-4",
-            "name": "Google Sheets",
-            "parameters": {
-                "columns": {
-                    "attemptToConvertTypes": false,
-                    "convertFieldsToString": false,
-                    "mappingMode": "defineBelow",
-                    "matchingColumns": [],
-                    "schema": [],
-                    "value": {}
-                },
-                "documentId": {
-                    "__rl": true,
-                    "mode": "id",
-                    "value": "YOUR_DOCUMENT_ID"
-                },
-                "operation": "append",
-                "options": {},
-                "sheetName": {
-                    "__rl": true,
-                    "mode": "name",
-                    "value": "Sheet1"
-                }
-            },
-            "position": [
-                1104,
-                208
-            ],
-            "type": "n8n-nodes-base.googleSheets",
-            "typeVersion": 4
-        }
-    ],
-    "connections": {
-        "Flatten Schedule": {
-            "main": [
-                [
-                    {
-                        "index": 0,
-                        "node": "Google Sheets",
-                        "type": "main"
-                    }
-                ]
-            ]
-        },
-        "Is Valid?": {
-            "main": [
-                [
-                    {
-                        "index": 0,
-                        "node": "Solve API",
-                        "type": "main"
-                    }
-                ],
-                [
-                    {
-                        "index": 0,
-                        "node": "Stop on Error",
-                        "type": "main"
-                    }
-                ]
-            ]
-        },
-        "Solve API": {
-            "main": [
-                [
-                    {
-                        "index": 0,
-                        "node": "Flatten Schedule",
-                        "type": "main"
-                    }
-                ]
-            ]
-        },
-        "Validate API": {
-            "main": [
-                [
-                    {
-                        "index": 0,
-                        "node": "Is Valid?",
-                        "type": "main"
-                    }
-                ]
-            ]
-        },
-        "Webhook": {
-            "main": [
-                [
-                    {
-                        "index": 0,
-                        "node": "Validate API",
-                        "type": "main"
-                    }
-                ]
-            ]
-        },
-        "When clicking ‘Execute workflow’": {
-            "main": [
-                [
-                    {
-                        "index": 0,
-                        "node": "Validate API",
-                        "type": "main"
-                    }
-                ]
-            ]
-        }
+  "name": "OR-Tools SchedulAI solver",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ortools-solve",
+        "options": {}
+      },
+      "id": "node-1",
+      "name": "Webhook",
+      "position": [
+        112,
+        304
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "webhookId": "5f90d278-6917-4a04-a8c1-2a5c4ac91fcf"
     },
-    "active": false,
-    "settings": {
-        "executionOrder": "v1",
-        "saveDataErrorExecution": "all",
-        "saveDataSuccessExecution": "all",
-        "saveExecutionProgress": true,
-        "saveManualExecutions": true
+    {
+      "parameters": {},
+      "id": "d7393075-c8b1-47a9-822c-7ca1e1930fae",
+      "name": "When clicking \u2018Execute workflow\u2019",
+      "position": [
+        112,
+        496
+      ],
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.0.72:8001/validate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"spec\": $json.body ? $json.body : $json, \"max_time_seconds\": 10 } }}",
+        "options": {}
+      },
+      "id": "node-validate",
+      "name": "Validate API",
+      "position": [
+        304,
+        304
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.ok }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "valid-check-node-id",
+      "name": "Is Valid?",
+      "position": [
+        512,
+        304
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "errorMessage": "={{ $json.errors ? $json.errors.join(', ') : 'Errore sconosciuto durante la validazione' }}"
+      },
+      "id": "stop-error-node-id",
+      "name": "Stop on Error",
+      "position": [
+        720,
+        416
+      ],
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.0.72:8001/solve",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"spec\": $if($(\"Webhook\").isExecuted, $(\"Webhook\").first().json.body, $(\"When clicking \u2018Execute workflow\u2019\").first().json), \"max_time_seconds\": 30 } }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "node-2",
+      "name": "Solve API",
+      "position": [
+        704,
+        208
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst data = $input.first().json;\nif (!data || !data.schedule) return [];\nfor (const date of Object.keys(data.schedule)) {\n  for (const site of Object.keys(data.schedule[date])) {\n    if (site === 'OFF') {\n        for (const emp of data.schedule[date][site]) {\n            results.push({ json: { date, site, shift: 'OFF', employee: emp } });\n        }\n        continue;\n    }\n    for (const shift of Object.keys(data.schedule[date][site])) {\n      for (const emp of data.schedule[date][site][shift]) {\n        results.push({ json: { date, site, shift, employee: emp } });\n      }\n    }\n  }\n}\nreturn results;"
+      },
+      "id": "node-3",
+      "name": "Flatten Schedule",
+      "position": [
+        912,
+        208
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1U6pFWk7Hu5OEhmMZkJW1UmTDHPNAX30dv7_VwjZooNg",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Turni"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Data": "={{ $json.date }}",
+            "Cliente/Sede": "={{ $json.site }}",
+            "Turno (Mattina/Serale)": "={{ $json.shift }}",
+            "Dipendente": "={{ $json.employee }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Data",
+              "displayName": "Data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Cliente/Sede",
+              "displayName": "Cliente/Sede",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Turno (Mattina/Serale)",
+              "displayName": "Turno (Mattina/Serale)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Dipendente",
+              "displayName": "Dipendente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "NOTA",
+              "displayName": "NOTA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "node-4",
+      "name": "Google Sheets",
+      "position": [
+        1104,
+        208
+      ],
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "XhB46DjOXLGiBY5t",
+          "name": "Google Sheets account"
+        }
+      }
     }
+  ],
+  "connections": {
+    "Flatten Schedule": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Google Sheets",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Is Valid?": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Solve API",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Stop on Error",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Solve API": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Flatten Schedule",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Validate API": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Is Valid?",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Validate API",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "When clicking \u2018Execute workflow\u2019": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Validate API",
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {
+    "When clicking \u2018Execute workflow\u2019": [
+      {
+        "json": {
+          "$schema": "./dsl.schema.json",
+          "sets": {
+            "employees": [
+              "Marco Rossi",
+              "Alessandro Bianchi",
+              "Matteo Romano",
+              "Lorenzo Ferrari",
+              "Davide Esposito",
+              "Giulia Colombo",
+              "Chiara Ricci",
+              "Sara Marino",
+              "Martina Greco",
+              "Sofia Conti"
+            ],
+            "days": [
+              "2026-03-02",
+              "2026-03-03",
+              "2026-03-04",
+              "2026-03-05",
+              "2026-03-06",
+              "2026-03-07",
+              "2026-03-08"
+            ],
+            "shifts": [
+              "M",
+              "S",
+              "OFF"
+            ],
+            "sites": [
+              "SITE_A"
+            ]
+          },
+          "shifts": {
+            "M": {
+              "start": "07:00",
+              "end": "15:00",
+              "minutes": 480,
+              "is_work": true
+            },
+            "S": {
+              "start": "15:00",
+              "end": "23:00",
+              "minutes": 480,
+              "is_work": true
+            },
+            "OFF": {
+              "start": "00:00",
+              "end": "00:00",
+              "minutes": 0,
+              "is_work": false
+            }
+          },
+          "employees": {
+            "Marco Rossi": {
+              "skills": [
+                "certified"
+              ],
+              "roles": [
+                "cleaner"
+              ],
+              "site_home": "SITE_A",
+              "contract": {
+                "type": "full_time"
+              }
+            },
+            "Alessandro Bianchi": {
+              "skills": [
+                "certified"
+              ],
+              "roles": [
+                "cleaner"
+              ],
+              "site_home": "SITE_A",
+              "contract": {
+                "type": "full_time"
+              }
+            },
+            "Matteo Romano": {
+              "skills": [
+                "certified"
+              ],
+              "roles": [
+                "cleaner"
+              ],
+              "site_home": "SITE_A",
+              "contract": {
+                "type": "full_time"
+              }
+            },
+            "Lorenzo Ferrari": {
+              "skills": [],
+              "roles": [
+                "cleaner"
+              ],
+              "site_home": "SITE_A",
+              "contract": {
+                "type": "full_time"
+              }
+            },
+            "Davide Esposito": {
+              "skills": [],
+              "roles": [
+                "cleaner"
+              ],
+              "site_home": "SITE_A",
+              "contract": {
+                "type": "full_time"
+              }
+            },
+            "Giulia Colombo": {
+              "skills": [],
+              "roles": [
+                "cleaner"
+              ],
+              "site_home": "SITE_A",
+              "contract": {
+                "type": "full_time"
+              }
+            },
+            "Chiara Ricci": {
+              "skills": [],
+              "roles": [
+                "cleaner"
+              ],
+              "site_home": "SITE_A",
+              "contract": {
+                "type": "full_time"
+              }
+            },
+            "Sara Marino": {
+              "skills": [],
+              "roles": [
+                "cleaner"
+              ],
+              "site_home": "SITE_A",
+              "contract": {
+                "type": "full_time"
+              }
+            },
+            "Martina Greco": {
+              "skills": [],
+              "roles": [
+                "cleaner"
+              ],
+              "site_home": "SITE_A",
+              "contract": {
+                "type": "full_time"
+              }
+            },
+            "Sofia Conti": {
+              "skills": [],
+              "roles": [
+                "cleaner"
+              ],
+              "site_home": "SITE_A",
+              "contract": {
+                "type": "full_time"
+              }
+            }
+          },
+          "demand": [
+            {
+              "day": "2026-03-02",
+              "site": "SITE_A",
+              "shift": "M",
+              "min": 3,
+              "max": 3,
+              "requirements": {
+                "skills_min": [
+                  {
+                    "skill": "certified",
+                    "min": 1
+                  }
+                ]
+              }
+            },
+            {
+              "day": "2026-03-02",
+              "site": "SITE_A",
+              "shift": "S",
+              "min": 2,
+              "max": 2,
+              "requirements": {
+                "skills_min": [
+                  {
+                    "skill": "certified",
+                    "min": 1
+                  }
+                ]
+              }
+            },
+            {
+              "day": "2026-03-03",
+              "site": "SITE_A",
+              "shift": "M",
+              "min": 3,
+              "max": 3,
+              "requirements": {
+                "skills_min": [
+                  {
+                    "skill": "certified",
+                    "min": 1
+                  }
+                ]
+              }
+            },
+            {
+              "day": "2026-03-03",
+              "site": "SITE_A",
+              "shift": "S",
+              "min": 2,
+              "max": 2,
+              "requirements": {
+                "skills_min": [
+                  {
+                    "skill": "certified",
+                    "min": 1
+                  }
+                ]
+              }
+            },
+            {
+              "day": "2026-03-04",
+              "site": "SITE_A",
+              "shift": "M",
+              "min": 3,
+              "max": 3,
+              "requirements": {
+                "skills_min": [
+                  {
+                    "skill": "certified",
+                    "min": 1
+                  }
+                ]
+              }
+            },
+            {
+              "day": "2026-03-04",
+              "site": "SITE_A",
+              "shift": "S",
+              "min": 2,
+              "max": 2,
+              "requirements": {
+                "skills_min": [
+                  {
+                    "skill": "certified",
+                    "min": 1
+                  }
+                ]
+              }
+            },
+            {
+              "day": "2026-03-05",
+              "site": "SITE_A",
+              "shift": "M",
+              "min": 3,
+              "max": 3,
+              "requirements": {
+                "skills_min": [
+                  {
+                    "skill": "certified",
+                    "min": 1
+                  }
+                ]
+              }
+            },
+            {
+              "day": "2026-03-05",
+              "site": "SITE_A",
+              "shift": "S",
+              "min": 2,
+              "max": 2,
+              "requirements": {
+                "skills_min": [
+                  {
+                    "skill": "certified",
+                    "min": 1
+                  }
+                ]
+              }
+            },
+            {
+              "day": "2026-03-06",
+              "site": "SITE_A",
+              "shift": "M",
+              "min": 3,
+              "max": 3,
+              "requirements": {
+                "skills_min": [
+                  {
+                    "skill": "certified",
+                    "min": 1
+                  }
+                ]
+              }
+            },
+            {
+              "day": "2026-03-06",
+              "site": "SITE_A",
+              "shift": "S",
+              "min": 2,
+              "max": 2,
+              "requirements": {
+                "skills_min": [
+                  {
+                    "skill": "certified",
+                    "min": 1
+                  }
+                ]
+              }
+            },
+            {
+              "day": "2026-03-07",
+              "site": "SITE_A",
+              "shift": "M",
+              "min": 3,
+              "max": 3,
+              "requirements": {
+                "skills_min": [
+                  {
+                    "skill": "certified",
+                    "min": 1
+                  }
+                ]
+              }
+            },
+            {
+              "day": "2026-03-07",
+              "site": "SITE_A",
+              "shift": "S",
+              "min": 2,
+              "max": 2,
+              "requirements": {
+                "skills_min": [
+                  {
+                    "skill": "certified",
+                    "min": 1
+                  }
+                ]
+              }
+            },
+            {
+              "day": "2026-03-08",
+              "site": "SITE_A",
+              "shift": "M",
+              "min": 3,
+              "max": 3,
+              "requirements": {
+                "skills_min": [
+                  {
+                    "skill": "certified",
+                    "min": 1
+                  }
+                ]
+              }
+            },
+            {
+              "day": "2026-03-08",
+              "site": "SITE_A",
+              "shift": "S",
+              "min": 2,
+              "max": 2,
+              "requirements": {
+                "skills_min": [
+                  {
+                    "skill": "certified",
+                    "min": 1
+                  }
+                ]
+              }
+            }
+          ],
+          "constraints": [
+            {
+              "id": "C1",
+              "type": "hard",
+              "kind": "exactly_one_assignment_per_day",
+              "scope": {
+                "employees": "ALL"
+              },
+              "data": {
+                "shifts": [
+                  "M",
+                  "S",
+                  "OFF"
+                ]
+              }
+            },
+            {
+              "id": "C2",
+              "type": "hard",
+              "kind": "forbid_shift_sequences",
+              "scope": {
+                "employees": "ALL"
+              },
+              "data": {
+                "forbidden_pairs": [
+                  {
+                    "prev_shift": "S",
+                    "next_shift": "M"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "C3",
+              "type": "hard",
+              "kind": "max_shifts_in_window",
+              "scope": {
+                "employees": "ALL"
+              },
+              "data": {
+                "window_days": 7,
+                "shifts": [
+                  "M",
+                  "S"
+                ],
+                "max": 5,
+                "mode": "rolling"
+              }
+            },
+            {
+              "id": "S1",
+              "type": "soft",
+              "kind": "penalize_work_on_days",
+              "scope": {
+                "employees": [
+                  "Sofia Conti"
+                ]
+              },
+              "data": {
+                "days": [
+                  "2026-03-07",
+                  "2026-03-08"
+                ],
+                "working_shifts": [
+                  "M",
+                  "S"
+                ]
+              },
+              "penalty": {
+                "weight": 3
+              }
+            },
+            {
+              "id": "S2",
+              "type": "soft",
+              "kind": "fair_distribution",
+              "scope": {
+                "employees": "ALL"
+              },
+              "data": {
+                "measure": "count",
+                "shifts": [
+                  "S"
+                ],
+                "window_days": 7,
+                "target": "auto_mean",
+                "penalize": "absolute_deviation"
+              },
+              "penalty": {
+                "weight": 5
+              }
+            }
+          ],
+          "objective": {
+            "mode": "minimize",
+            "terms": [
+              {
+                "kind": "soft_penalties_total",
+                "weight": 1
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "versionId": "5fecfad9-157f-4bfb-be13-576f95c09c31",
+  "versionCounter": 54
 }
