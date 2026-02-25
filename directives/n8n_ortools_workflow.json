@@ -11,7 +11,7 @@
             "type": "n8n-nodes-base.webhook",
             "typeVersion": 1,
             "position": [
-                250,
+                100,
                 300
             ],
             "webhookId": "ortools-webhook-id"
@@ -19,10 +19,74 @@
         {
             "parameters": {
                 "method": "POST",
+                "url": "http://192.168.0.72:8001/validate",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={ \"spec\": {{$json.body}}, \"max_time_seconds\": 10}",
+                "options": {}
+            },
+            "name": "Validate API",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                300,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "id": "18f99e46-ef92-4fdb-ac1c-7de205a278d6",
+                            "leftValue": "={{ $json.valid }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "valid-check-node-id",
+            "name": "Is Valid?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 3.2,
+            "position": [
+                500,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "errorMessage": "={{ $json.errors ? $json.errors.join(', ') : 'Errore sconosciuto durante la validazione' }}"
+            },
+            "id": "stop-error-node-id",
+            "name": "Stop on Error",
+            "type": "n8n-nodes-base.stopAndError",
+            "typeVersion": 1,
+            "position": [
+                500,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
                 "url": "http://192.168.0.72:8001/solve",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={ \"spec\": {{$json.body}}, \"max_time_seconds\": 30 }",
+                "jsonBody": "={ \"spec\": {{$node[\"Webhook\"].json.body}}, \"max_time_seconds\": 30 }",
                 "options": {
                     "timeout": 60000
                 }
@@ -31,8 +95,8 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4,
             "position": [
-                450,
-                300
+                700,
+                200
             ]
         },
         {
@@ -43,8 +107,8 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
             "position": [
-                650,
-                300
+                900,
+                200
             ]
         },
         {
@@ -66,8 +130,8 @@
             "type": "n8n-nodes-base.googleSheets",
             "typeVersion": 4,
             "position": [
-                850,
-                300
+                1100,
+                200
             ]
         }
     ],
@@ -76,7 +140,36 @@
             "main": [
                 [
                     {
+                        "node": "Validate API",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Validate API": {
+            "main": [
+                [
+                    {
+                        "node": "Is Valid?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is Valid?": {
+            "main": [
+                [
+                    {
                         "node": "Solve API",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Stop on Error",
                         "type": "main",
                         "index": 0
                     }
