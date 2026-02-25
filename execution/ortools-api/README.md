@@ -22,7 +22,7 @@ docker-compose up -d --build
 
 ## Integrazione n8n (Scheduling Automation)
 
-Per l'automazione dei turni e il salvataggio su **Google Sheets** validato, puoi importare il workflow situato in `directives/n8n_ortools_workflow.json` all'interno dell'istanza n8n (spesso esposta su `192.168.0.72`).
+Per l'automazione dei turni e il salvataggio su **Google Sheets** validato, puoi importare il workflow situato in `execution/n8n/n8n_ortools_workflow.json` all'interno dell'istanza n8n (spesso esposta su `192.168.0.72`).
 
 1. **Trigger Base**: Usa un Webhook in POST verso l'n8n.
 2. **Endpoint Mappato**: `http://192.168.0.72:8001/solve` che offre un'operazione completamente *sincrona* in caso di esecuzioni semplici (<= max_time_seconds, es. 30s).

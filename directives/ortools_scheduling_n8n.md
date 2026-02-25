@@ -9,7 +9,7 @@ Configurare e gestire in autonomia l'assegnazione e l'elaborazione dei turni del
 
 ## Strumenti e Componenti
 - **Docker/Server API:** Il server `solver-api` in esecuzione in Docker (in genere disponibile su `192.168.0.72:8001`).
-- **N8N Workflow File:** Il file `directives/n8n_ortools_workflow.json` contiene la definizione del workflow da importare sull'istanza `192.168.0.72`.
+- **N8N Workflow File:** Il file `execution/n8n/n8n_ortools_workflow.json` contiene la definizione del workflow da importare sull'istanza `192.168.0.72`.
 
 ## Flusso Esecutivo (Orchestrazione su N8N)
 Quando c'è necessità di implementare/rielaborare questo workflow, il flusso è il seguente:
