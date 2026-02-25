@@ -3,8 +3,6 @@
     "nodes": [
         {
             "parameters": {
-                "title": "Generatore Orari SchedulAI",
-                "description": "Descrivi i tuoi requisiti per la generazione automatica dei turni.",
                 "formFields": {
                     "values": [
                         {
@@ -15,7 +13,10 @@
                         }
                     ]
                 },
-                "options": {}
+                "options": {},
+                "formTitle": "Generatore Orari SchedulAI",
+                "formDescription": "Descrivi i tuoi requisiti per la generazione automatica dei turni.",
+                "path": "schedulai-form"
             },
             "id": "form-trigger-id",
             "name": "On form submission",
