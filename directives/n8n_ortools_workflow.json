@@ -36,32 +36,18 @@
         {
             "parameters": {
                 "conditions": {
-                    "options": {
-                        "caseSensitive": true,
-                        "leftValue": "",
-                        "typeValidation": "strict",
-                        "version": 2
-                    },
-                    "conditions": [
+                    "boolean": [
                         {
-                            "id": "18f99e46-ef92-4fdb-ac1c-7de205a278d6",
-                            "leftValue": "={{ $json.valid }}",
-                            "rightValue": true,
-                            "operator": {
-                                "type": "boolean",
-                                "operation": "true",
-                                "singleValue": true
-                            }
+                            "value1": "={{ $json.valid }}",
+                            "value2": true
                         }
-                    ],
-                    "combinator": "and"
-                },
-                "options": {}
+                    ]
+                }
             },
             "id": "valid-check-node-id",
             "name": "Is Valid?",
             "type": "n8n-nodes-base.if",
-            "typeVersion": 3.2,
+            "typeVersion": 1,
             "position": [
                 500,
                 300
